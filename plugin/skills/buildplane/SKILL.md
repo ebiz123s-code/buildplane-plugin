@@ -32,6 +32,14 @@ DECISIONS.md and `.buildplane/` DO go in the project folder.
 folder is replaced wholesale on every update, which would delete the key.
 
 ## Setup (first run only)
+**Say something before you do anything.** The checks below take a few seconds and run
+several commands, and the desktop app shows nothing but a spinner meanwhile — worse, it prints
+a grey line claiming the command was not recognised, which is untrue and reads like a failure.
+A member who is thirty seconds into their first ever run assumes it broke and closes the window.
+So: FIRST reply with one short line — "Checking your Buildplane setup, one moment." — and only
+then start running commands. Same rule anywhere else you are about to be quiet for more than a
+few seconds.
+
 1. `node $BP/scripts/bl.mjs check` — confirms the license key.
    If it fails with "No license key", DO NOT tell the member to create a file. Ask them to
    copy their key from the dashboard (ebiz123s.com/apps/buildplane → setup step 2 → "Make my
