@@ -1,0 +1,16 @@
+{
+  "name": "ebiz123s",
+  "owner": { "name": "eBiz123s", "url": "https://ebiz123s.com" },
+  "metadata": {
+    "description": "Plugins by eBiz123s",
+    "homepage": "https://ebiz123s.com/apps/buildplane"
+  },
+  "plugins": [
+    {
+      "name": "buildplane",
+      "version": "0.3.3",
+      "source": "./plugin",
+      "description": "Describe what you want built in plain English, read the plan before anything happens, then build it one proof-gated step at a time into your Estage project."
+    }
+  ]
+}

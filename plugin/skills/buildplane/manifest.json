@@ -1,0 +1,26 @@
+{
+  "name": "buildplane",
+  "version": "0.3.3",
+  "updated": "2026-09-14",
+  "files": [
+    "SKILL.md",
+    "install.ps1",
+    "install.sh",
+    "recipes/booking-page.md",
+    "recipes/business-site.md",
+    "recipes/lead-magnet-funnel.md",
+    "recipes/members-area.md",
+    "recipes/quiz-funnel.md",
+    "recipes/sales-funnel.md",
+    "recipes/sales-page-order-form.md",
+    "recipes/video-sales-page.md",
+    "recipes/webinar-funnel.md",
+    "references/jargon-list.md",
+    "references/judge-rules.md",
+    "references/plan-rules.md",
+    "references/proof-rules.md",
+    "scripts/bl.mjs",
+    "scripts/judge.mjs",
+    "scripts/runner.mjs"
+  ]
+}

@@ -1,0 +1,148 @@
+---
+name: buildplane
+description: Use when the member says /buildplane plan "<idea>" or /buildplane next — turns a rambling idea into a versioned, proof-gated build plan and runs it one step at a time against their Genesis project (or a local repo) on their own Claude subscription.
+user-invocable: true
+args:
+  - name: command
+    description: plan ["<idea>"] or next, either optionally with --project <id>
+    required: false
+---
+
+# Buildplane
+
+Describe → See the plan → Press Run. You are the builder; the dashboard at
+ebiz123s.com/apps/buildplane is where the member watches progress. **Every server
+call goes through `~/.claude/skills/buildplane/scripts/bl.mjs`** (it holds the license key) — never compose
+HTTP yourself. All commands print JSON; a non-zero exit means stop and show the
+error to the member in plain words.
+
+**Where the scripts are:** `scripts/`, `references/` and `recipes/` are inside THIS
+skill's folder (the folder holding this SKILL.md — normally `~/.claude/skills/buildplane`),
+NOT the member's project folder. Always call them by that absolute path, e.g.
+`node ~/.claude/skills/buildplane/scripts/bl.mjs check`. The license lives there too
+(`license.json` next to SKILL.md). Never look for, copy, or create these files inside the
+project folder. Plans, SPEC.md, DECISIONS.md and `.buildplane/` DO go in the project folder.
+
+## Setup (first run only)
+1. `node ~/.claude/skills/buildplane/scripts/bl.mjs check` — confirms the license key (license.json next to this
+   folder, or `BUILDPLANE_KEY`). If it fails, the member copies a key from the
+   dashboard → Settings → License keys.
+2. **Bind to the right Genesis project before touching anything.** A Buildplane project
+   records the Estage project it builds into as `genesis_project_id`, and that project's
+   tools are namespaced `genesis-<genesis_project_id>` (e.g. `genesis-34698`). Members
+   commonly have three Estage projects connected at once, so several `genesis-*` tool sets
+   are loaded and a bare `genesis_*` call is ambiguous — guessing means building into one
+   of their other LIVE sites. Always use the set whose id matches this project. If that set
+   is absent, STOP and say so: the member connects that specific project (Estage →
+   Settings → Integrations → Coding agents → pick it in the PROJECT dropdown → Generate
+   token → run its `claude mcp add` line) and restarts Claude. Never fall back to a
+   different `genesis-*` set, even if only one is present.
+   If MANY `genesis-*` sets are loaded (some members have unlimited Estage projects, and
+   each connected one adds ~68 tools to every session), say so once and suggest they
+   `claude mcp remove` the projects they are not building. Do not remove anything yourself.
+
+## `/buildplane plan ["<idea>"] [--project <id>]`
+1. `node ~/.claude/skills/buildplane/scripts/bl.mjs projects` → pick the project the member names (or ask; if
+   none, tell them to create one on the dashboard — it takes 10 seconds).
+2. Get the idea, in this order:
+   - `node ~/.claude/skills/buildplane/scripts/bl.mjs project <projectId>` → `project.brief`. If it is set, that
+     is the idea: the member answered the dashboard questionnaire (`mode: "questions"`: kind,
+     audience, action, working[], have[], steps[], offer, traffic, avoid, notes) or wrote free
+     text (`mode: "text"`: `text`). A quoted idea on the command adds to the brief; it never replaces it.
+   - No brief and a quoted idea → use the idea as today.
+   - No brief and no idea → ask the questionnaire in chat, one question at a time, and say on the
+     first one "or just tell me in a sentence or two". Questions: What are you building (site:
+     business website / landing or sales page / members area / booking page; funnel: lead magnet /
+     quiz / sales with upsell / webinar or video / booking)? Who is it for? The one thing a visitor
+     should do? How will you know it works? What do you already have (words, product in Estage,
+     logo and images, domain, nothing yet)? For a funnel: which steps, in what order, and what is the
+     offer or lead magnet? Anything it must not do? Anything else? Every question is skippable.
+     Save what they said back to the project: `bl.mjs brief <projectId> <brief.json>` (same shape as
+     the dashboard's), so the dashboard shows it.
+   Read `references/plan-rules.md` and `references/jargon-list.md`. Match the brief's `kind`
+   (or the idea's words) to a recipe in `recipes/` and start from it. A funnel brief's `steps`
+   list is the page order — keep it; drop the unticked defaults into `later`. "Nothing yet" in
+   `have` → add a "Write the offer" (or "Write the words") step first.
+3. Write the plan JSON to `.buildplane/plan.json` in the working folder:
+   ```json
+   { "spec": "<one-paragraph SPEC>", "core_outcomes": ["<exactly one>"],
+     "live":  [{ "title": "", "plain_summary": "", "owns_files": [], "proof": "", "tokens_est": 0 }],
+     "later": [{ "title": "", "plain_summary": "", "owns_files": [], "proof": "" }] }
+   ```
+   Rules that the server enforces: every step has title + plain_summary + proof;
+   one core outcome; live ≤ 12 steps (warning above); the last THREE live steps are
+   ALWAYS "Mobile check", "Quality check" and "Publish + smoke test" (the server adds
+   any that are missing). Everything non-essential goes to `later` with a "you didn't
+   think of this" group.
+4. Also write `SPEC.md` (the spec paragraph + the live steps as a checklist) and
+   create `DECISIONS.md` with a header — both in the working folder.
+5. `node ~/.claude/skills/buildplane/scripts/bl.mjs plan-import <projectId> .buildplane/plan.json`. Show the
+   member the result: version number, live/later counts, any warnings, and say
+   "Press **Run next step** on the dashboard, or tell me `/buildplane next`."
+
+## `/buildplane next [--project <id>]`
+1. `node ~/.claude/skills/buildplane/scripts/bl.mjs claim <projectId>`.
+   - Keep the `run_id` it prints: `report` refuses a result without `--run <runId>`,
+     and only the run that claimed a step may report it (so two builders cannot
+     both write the same step). `claim` also starts a background check-in for that
+     run (every 30 s until you report), so a long build is never mistaken for a dead
+     one; a run that stops checking in for 15 minutes is handed back.
+   - `step: null, busy: {...}` → a step is already running; say so and stop. (If that step has
+     been silent for 15 minutes the server hands it back on the next claim; the member can also
+     press "Start this step again" on the dashboard.)
+   - `step: null` → nothing is queued; tell the member to press Run on the dashboard
+     (queuing is a dashboard action so they stay in control) and stop.
+2. Read the project's **Look and feel** first: `node ~/.claude/skills/buildplane/scripts/bl.mjs project <projectId>`
+   → `project.brand` = `{ scheme, colors: { bg, ink, accent }, images: [{ label, url }], notes }`.
+   Also read `project.build_options` if it is set: `{ model, style, special_effects, interactive_level, image_density }`.
+   - `model`: use that model preference when you are the builder or when you write the build prompt; if it is unavailable, fall back to the next valid configured model automatically.
+   - `style`: `minimal` = restrained, clean, low-noise; `balanced` = polished and even; `premium` = richer motion, more layered visual interest, more pronounced callouts.
+   - `special_effects`: if true, allow motion accents, soft gradients, layered shadows, floating cards, and tasteful decorative effects. If false, keep it minimal and premium.
+   - `interactive_level`: `little` = sparse interaction; `some` = moderate micro-interactions; `lots` = more hover states, animated reveals, carousels, tabs, and richer UI motion.
+   - `image_density`: `balanced` = selective imagery; `heavy` = more visual content, hero imagery, supporting media, and collage-like composition.
+   Use exactly those colours (tints and a deeper shade of each are fine), put each image
+   where its label says, and never add photos the member did not give you. If `brand` is
+   empty, choose two fonts and a calm, restrained scheme yourself and write the choice into
+   DECISIONS.md so the member can change it. If `brand` is present but `build_options` set a
+   more vibrant style, make the actual implementation feel richer without violating the brand palette.
+   Build ONLY that step, touching only `owns_files` (other steps may run later in
+   parallel). A step whose title starts with **"Change:"** was added from the dashboard's
+   "Ask for a change" button: its `plain_summary` is the member's request in their own
+   words. Make that change in the files it owns, keep everything else exactly as it was,
+   run every gate again, and if the project was already published, publish again so the
+   live page shows the change. Genesis target: `genesis_context` once per session on this project's own
+   `genesis-<genesis_project_id>` tools → edit files → that same set's
+   `genesis_preview_logs` must show `viteError: null`. Local target: edit → run the
+   project's tests.
+3. Prove it — read `references/proof-rules.md`. Gates in order: preview compiles;
+   the step's own `proof` sentence is satisfied; `genesis_screenshot` (same tool set) of the page
+   (save to `.buildplane/shots/<step>.jpg`); mobile width for UI steps.
+   **If the claimed step is "Quality check"**, there is nothing to build: read
+   `references/judge-rules.md` and run it exactly — evidence bundle → deterministic
+   `node ~/.claude/skills/buildplane/scripts/judge.mjs precheck` → one judge → `node ~/.claude/skills/buildplane/scripts/judge.mjs gate`.
+   The gate's exit code is the verdict (0 pass, 1 reject). Max 2 rounds, then report
+   `failed` with the scorecard. Never soften a REJECT.
+4. Append to `DECISIONS.md`: date, step title, what was decided and why (2–4 lines).
+5. Report:
+   - success: `node ~/.claude/skills/buildplane/scripts/bl.mjs upload <stepId> <shot>` → then
+     `node ~/.claude/skills/buildplane/scripts/bl.mjs report <stepId> done --run <runId> --tokens <est> --screenshot <path> --result '{"proof":"<what you verified>"}' --log <logfile>`
+   - a gate failed: `report <stepId> failed --run <runId> --result '{"gate":"<which>","why":"<plain words>"}'`
+     and tell the member what failed and the one thing you'd try next. Never mark a
+     step done on a failed gate.
+   Token estimate: sum the `usage` fields from this session's JSONL since the claim
+   (or estimate from words written × 1.3 if unavailable) — an honest number, not 0.
+6. Say the new percent (from `node ~/.claude/skills/buildplane/scripts/bl.mjs project <projectId>` → `progress`)
+   in one line, then stop. Do not claim the next step unless the member asked to
+   "keep going" — then loop from 1 until `step: null`.
+
+## Voice
+Plain English, no jargon from `references/jargon-list.md` in anything the member
+reads (titles, summaries, messages). Short. Honest about what was and wasn't proven.
+
+## Red flags — stop and re-read the rules
+- Writing files outside the step's `owns_files`.
+- Reporting `done` without a screenshot for a UI step.
+- A plan with two core outcomes or no "Publish + smoke test" step.
+- Composing a fetch/curl to the API instead of calling `bl.mjs`.
+- Deciding the Quality check verdict yourself instead of reading `judge.mjs gate`'s exit
+  code, or running a third judging round.
