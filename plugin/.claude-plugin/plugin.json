@@ -1,6 +1,6 @@
 {
   "name": "buildplane",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "Describe what you want built in plain English, read the plan before anything happens, then build it one proof-gated step at a time into your Estage project.",
   "homepage": "https://ebiz123s.com/apps/buildplane",
   "author": { "name": "eBiz123s", "url": "https://ebiz123s.com" }

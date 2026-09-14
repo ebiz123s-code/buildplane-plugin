@@ -50,15 +50,25 @@ few seconds.
    here, and they should make the key again while signed in as the right person.
    Keys are `bl_` followed by 32 hex characters; anything else is not a Buildplane key.
 2. **Bind to the right Genesis project before touching anything.** A Buildplane project
-   records the Estage project it builds into as `genesis_project_id`, and that project's
-   tools are namespaced `genesis-<genesis_project_id>` (e.g. `genesis-34698`). Members
-   commonly have three Estage projects connected at once, so several `genesis-*` tool sets
-   are loaded and a bare `genesis_*` call is ambiguous — guessing means building into one
-   of their other LIVE sites. Always use the set whose id matches this project. If that set
-   is absent, STOP and say so: the member connects that specific project (Estage →
-   Settings → Integrations → Coding agents → pick it in the PROJECT dropdown → Generate
-   token → run its `claude mcp add` line) and restarts Claude. Never fall back to a
-   different `genesis-*` set, even if only one is present.
+   records the Estage project it builds into as `genesis_project_id`. Members commonly have
+   several Estage projects connected at once, so several Genesis tool sets are loaded and a bare
+   `genesis_*` call is ambiguous — guessing means building into one of their other LIVE sites.
+   Work out which set is the right one like this, and never skip it:
+   - **By name.** A project added with `claude mcp add` is namespaced `genesis-<id>`, e.g.
+     `mcp__genesis-34698__genesis_write_file`. If a set's id matches this project's
+     `genesis_project_id`, that is the one. Done.
+   - **By asking it.** A project added through Claude's **Connectors** panel is namespaced by an
+     opaque UUID instead — `mcp__209e36ed-09f1-4a92-bb8a-7e8db3aa1783__` — with the project
+     number nowhere in the name. Do NOT guess from the connector's label; the member typed that
+     and it can say anything. Call `genesis_preview` on each unidentified set: it is read-only,
+     cheap, and returns `{ "projectId": "74498", ... }`. Use the set whose `projectId` equals
+     this project's `genesis_project_id`.
+   If no set matches after both checks, STOP and say so. The member connects that specific
+   project: Estage → Settings → Integrations → Coding agents → pick it in the PROJECT dropdown,
+   then EITHER paste its MCP server URL into Claude's Settings → Connectors → Add custom
+   connector (no token, approve in the browser) OR generate a token and run its `claude mcp add`
+   line. Then restart Claude. Never fall back to a different Genesis set, even if only one is
+   present.
    If MANY `genesis-*` sets are loaded (some members have unlimited Estage projects, and
    each connected one adds ~68 tools to every session), say so once and suggest they
    `claude mcp remove` the projects they are not building. Do not remove anything yourself.
