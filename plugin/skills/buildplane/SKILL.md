@@ -135,6 +135,23 @@ project folder. Plans, SPEC.md, DECISIONS.md and `.buildplane/` DO go in the pro
    in one line, then stop. Do not claim the next step unless the member asked to
    "keep going" — then loop from 1 until `step: null`.
 
+## `/buildplane watch [--project <id>]`
+One line per work session instead of `/buildplane next` per step. The member presses
+**Run next step** (or **Keep going**) on the dashboard and the steps just build.
+1. `node ~/.claude/skills/buildplane/scripts/bl.mjs wait <projectId>` — it blocks in Node until
+   a step is queued and nothing else is building, so waiting costs no tokens. It prints
+   `{ ready: true, next: "<title>" }` when there is work, or `{ ready: false, timeout: true }`
+   after 30 minutes.
+2. `ready: true` → run `/buildplane next` exactly as written above (claim, build, prove,
+   report), then go back to 1.
+3. `timeout: true` → say in one line that nothing has been queued for half an hour and you
+   have stopped watching, and tell them to type `/buildplane watch` again when they want more.
+   Stop. Do not loop forever without telling them.
+4. If a step fails, report it as `next` does, say so, and keep watching — a failed step does
+   not end the session. If the same step fails twice, stop watching and say why.
+Tell the member once, at the start: you are watching, they can queue steps from the
+dashboard, and closing this window stops it.
+
 ## Voice
 Plain English, no jargon from `references/jargon-list.md` in anything the member
 reads (titles, summaries, messages). Short. Honest about what was and wasn't proven.

@@ -12,6 +12,7 @@
 //   node bl.mjs report <stepId> <done|failed|skipped> [--run <runId>] [--tokens <n>] [--log <file>] [--result <json>] [--screenshot <path>]
 //   node bl.mjs upload <stepId> <file>          → prints the stored path (use with report --screenshot)
 //   node bl.mjs note <projectId> <text>         → plain-words reason shown on the dashboard while nothing runs
+//   node bl.mjs wait <projectId> [--every 15] [--timeout 1800]  → blocks until a step is queued
 //   node bl.mjs beat <runId> [--loop]           → check-in for the run that claimed a step (claim starts the loop itself)
 //
 // License key: license.json next to this pack ({ "key": "bl_…" }) or env BUILDPLANE_KEY.
@@ -92,6 +93,26 @@ switch (cmd) {
       child.unref();
     }
     out(claimed);
+    break;
+  }
+  // wait — block until this project has work, sleeping in Node rather than by burning model
+  // turns. /buildplane watch loops on this, so the member types one line per work session
+  // instead of /buildplane next for every single step, and the waiting costs no tokens at all.
+  case 'wait': {
+    const projectId = args[0];
+    if (!projectId) die('usage: wait <projectId> [--every 15] [--timeout 1800]');
+    const every = Math.max(5, +(flag(args, '--every') || 15)) * 1000;
+    const until = Date.now() + Math.max(60, +(flag(args, '--timeout') || 1800)) * 1000;
+    for (;;) {
+      const d = await api({ action: 'project.get', projectId });
+      const steps = d.steps || [];
+      const queued = steps.filter((s2) => s2.section === 'live' && s2.status === 'queued');
+      const running = steps.find((s2) => s2.status === 'running');
+      // Something else is already building: wait it out rather than racing it for the claim.
+      if (queued.length && !running) { out({ ready: true, queued: queued.length, next: queued[0].title }); break; }
+      if (Date.now() >= until) { out({ ready: false, timeout: true, queued: queued.length, running: running ? running.title : null }); break; }
+      await new Promise((r) => setTimeout(r, every));
+    }
     break;
   }
   case 'beat': {
