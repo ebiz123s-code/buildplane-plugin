@@ -12,21 +12,35 @@ args:
 
 Describe → See the plan → Press Run. You are the builder; the dashboard at
 ebiz123s.com/apps/buildplane is where the member watches progress. **Every server
-call goes through `~/.claude/skills/buildplane/scripts/bl.mjs`** (it holds the license key) — never compose
+call goes through `$BP/scripts/bl.mjs`** (it holds the license key) — never compose
 HTTP yourself. All commands print JSON; a non-zero exit means stop and show the
 error to the member in plain words.
 
 **Where the scripts are:** `scripts/`, `references/` and `recipes/` are inside THIS
-skill's folder (the folder holding this SKILL.md — normally `~/.claude/skills/buildplane`),
-NOT the member's project folder. Always call them by that absolute path, e.g.
-`node ~/.claude/skills/buildplane/scripts/bl.mjs check`. The license lives there too
-(`license.json` next to SKILL.md). Never look for, copy, or create these files inside the
-project folder. Plans, SPEC.md, DECISIONS.md and `.buildplane/` DO go in the project folder.
+skill's folder, NOT the member's project folder. Work that folder out ONCE at the start of
+the session and call it **$BP** — every command below writes `$BP/scripts/…` and you
+substitute the real path. There are two shapes, because Buildplane installs two ways:
+- installed as a Claude Code plugin (the normal way now):
+  `~/.claude/plugins/cache/ebiz123s/buildplane/<version>/skills/buildplane`
+- installed by the older one-line installer: `~/.claude/skills/buildplane`
+If you are unsure which, the folder holding this SKILL.md is always the right answer. Never
+look for, copy, or create these files inside the project folder. Plans, SPEC.md,
+DECISIONS.md and `.buildplane/` DO go in the project folder.
+
+**Where the licence lives:** `<config dir>/buildplane/license.json`, where the config dir is
+`~/.claude` unless `CLAUDE_CONFIG_DIR` says otherwise. NOT next to the skill — a plugin
+folder is replaced wholesale on every update, which would delete the key.
 
 ## Setup (first run only)
-1. `node ~/.claude/skills/buildplane/scripts/bl.mjs check` — confirms the license key (license.json next to this
-   folder, or `BUILDPLANE_KEY`). If it fails, the member copies a key from the
-   dashboard → Settings → License keys.
+1. `node $BP/scripts/bl.mjs check` — confirms the license key.
+   If it fails with "No license key", DO NOT tell the member to create a file. Ask them to
+   copy their key from the dashboard (ebiz123s.com/apps/buildplane → setup step 2 → "Make my
+   key"), paste it into the chat, then **write it yourself**: create the folder the error
+   names and put `{ "key": "bl_…" }` in `license.json` there, using the Write tool. Run
+   `check` again and tell them whose account it belongs to (the `email` it prints) — if that
+   is not the account they are signed into on the dashboard, their projects will be invisible
+   here, and they should make the key again while signed in as the right person.
+   Keys are `bl_` followed by 32 hex characters; anything else is not a Buildplane key.
 2. **Bind to the right Genesis project before touching anything.** A Buildplane project
    records the Estage project it builds into as `genesis_project_id`, and that project's
    tools are namespaced `genesis-<genesis_project_id>` (e.g. `genesis-34698`). Members
@@ -42,10 +56,10 @@ project folder. Plans, SPEC.md, DECISIONS.md and `.buildplane/` DO go in the pro
    `claude mcp remove` the projects they are not building. Do not remove anything yourself.
 
 ## `/buildplane plan ["<idea>"] [--project <id>]`
-1. `node ~/.claude/skills/buildplane/scripts/bl.mjs projects` → pick the project the member names (or ask; if
+1. `node $BP/scripts/bl.mjs projects` → pick the project the member names (or ask; if
    none, tell them to create one on the dashboard — it takes 10 seconds).
 2. Get the idea, in this order:
-   - `node ~/.claude/skills/buildplane/scripts/bl.mjs project <projectId>` → `project.brief`. If it is set, that
+   - `node $BP/scripts/bl.mjs project <projectId>` → `project.brief`. If it is set, that
      is the idea: the member answered the dashboard questionnaire (`mode: "questions"`: kind,
      audience, action, working[], have[], steps[], offer, traffic, avoid, notes) or wrote free
      text (`mode: "text"`: `text`). A quoted idea on the command adds to the brief; it never replaces it.
@@ -76,12 +90,12 @@ project folder. Plans, SPEC.md, DECISIONS.md and `.buildplane/` DO go in the pro
    think of this" group.
 4. Also write `SPEC.md` (the spec paragraph + the live steps as a checklist) and
    create `DECISIONS.md` with a header — both in the working folder.
-5. `node ~/.claude/skills/buildplane/scripts/bl.mjs plan-import <projectId> .buildplane/plan.json`. Show the
+5. `node $BP/scripts/bl.mjs plan-import <projectId> .buildplane/plan.json`. Show the
    member the result: version number, live/later counts, any warnings, and say
    "Press **Run next step** on the dashboard, or tell me `/buildplane next`."
 
 ## `/buildplane next [--project <id>]`
-1. `node ~/.claude/skills/buildplane/scripts/bl.mjs claim <projectId>`.
+1. `node $BP/scripts/bl.mjs claim <projectId>`.
    - Keep the `run_id` it prints: `report` refuses a result without `--run <runId>`,
      and only the run that claimed a step may report it (so two builders cannot
      both write the same step). `claim` also starts a background check-in for that
@@ -92,7 +106,7 @@ project folder. Plans, SPEC.md, DECISIONS.md and `.buildplane/` DO go in the pro
      press "Start this step again" on the dashboard.)
    - `step: null` → nothing is queued; tell the member to press Run on the dashboard
      (queuing is a dashboard action so they stay in control) and stop.
-2. Read the project's **Look and feel** first: `node ~/.claude/skills/buildplane/scripts/bl.mjs project <projectId>`
+2. Read the project's **Look and feel** first: `node $BP/scripts/bl.mjs project <projectId>`
    → `project.brand` = `{ scheme, colors: { bg, ink, accent }, images: [{ label, url }], notes }`.
    Also read `project.build_options` if it is set: `{ model, style, special_effects, interactive_level, image_density }`.
    - `model`: use that model preference when you are the builder or when you write the build prompt; if it is unavailable, fall back to the next valid configured model automatically.
@@ -119,26 +133,26 @@ project folder. Plans, SPEC.md, DECISIONS.md and `.buildplane/` DO go in the pro
    (save to `.buildplane/shots/<step>.jpg`); mobile width for UI steps.
    **If the claimed step is "Quality check"**, there is nothing to build: read
    `references/judge-rules.md` and run it exactly — evidence bundle → deterministic
-   `node ~/.claude/skills/buildplane/scripts/judge.mjs precheck` → one judge → `node ~/.claude/skills/buildplane/scripts/judge.mjs gate`.
+   `node $BP/scripts/judge.mjs precheck` → one judge → `node $BP/scripts/judge.mjs gate`.
    The gate's exit code is the verdict (0 pass, 1 reject). Max 2 rounds, then report
    `failed` with the scorecard. Never soften a REJECT.
 4. Append to `DECISIONS.md`: date, step title, what was decided and why (2–4 lines).
 5. Report:
-   - success: `node ~/.claude/skills/buildplane/scripts/bl.mjs upload <stepId> <shot>` → then
-     `node ~/.claude/skills/buildplane/scripts/bl.mjs report <stepId> done --run <runId> --tokens <est> --screenshot <path> --result '{"proof":"<what you verified>"}' --log <logfile>`
+   - success: `node $BP/scripts/bl.mjs upload <stepId> <shot>` → then
+     `node $BP/scripts/bl.mjs report <stepId> done --run <runId> --tokens <est> --screenshot <path> --result '{"proof":"<what you verified>"}' --log <logfile>`
    - a gate failed: `report <stepId> failed --run <runId> --result '{"gate":"<which>","why":"<plain words>"}'`
      and tell the member what failed and the one thing you'd try next. Never mark a
      step done on a failed gate.
    Token estimate: sum the `usage` fields from this session's JSONL since the claim
    (or estimate from words written × 1.3 if unavailable) — an honest number, not 0.
-6. Say the new percent (from `node ~/.claude/skills/buildplane/scripts/bl.mjs project <projectId>` → `progress`)
+6. Say the new percent (from `node $BP/scripts/bl.mjs project <projectId>` → `progress`)
    in one line, then stop. Do not claim the next step unless the member asked to
    "keep going" — then loop from 1 until `step: null`.
 
 ## `/buildplane watch [--project <id>]`
 One line per work session instead of `/buildplane next` per step. The member presses
 **Run next step** (or **Keep going**) on the dashboard and the steps just build.
-1. `node ~/.claude/skills/buildplane/scripts/bl.mjs wait <projectId>` — it blocks in Node until
+1. `node $BP/scripts/bl.mjs wait <projectId>` — it blocks in Node until
    a step is queued and nothing else is building, so waiting costs no tokens. It prints
    `{ ready: true, next: "<title>" }` when there is work, or `{ ready: false, timeout: true }`
    after 30 minutes.
